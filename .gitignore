@@ -1,0 +1,29 @@
+# Build artifacts
+build/
+dist/
+*.spec.bak
+__pycache__/
+*.pyc
+
+# Large binary: ffmpeg.exe (~83MB) exceeds GitHub's file size limit.
+# Users should place ffmpeg.exe in the project root manually.
+ffmpeg.exe
+
+# Runtime output / state / logs (user data, not source)
+output/
+logs/
+*.log
+
+# Local secrets
+.env
+.env.local
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Virtual envs
+venv/
+.venv/
