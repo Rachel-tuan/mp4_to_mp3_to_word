@@ -51,12 +51,14 @@ def _set_run_font(run, cn_font: str, en_font: str, size_pt: float | None = None,
 
 def _style_doc_defaults(doc):
     """Override the default Normal / Heading styles so CJK and Latin share
-    the same font family, and headings are black instead of python-docx's
-    default blue."""
+    the same font family, headings are black, and paragraph spacing is
+    tight (no giant gaps between paragraphs)."""
+    from docx.shared import RGBColor, Pt
+
     # Normal (body text)
     normal = doc.styles["Normal"]
     normal.font.name = BODY_FONT_EN
-    normal.font.size = None  # leave at default (~11pt)
+    normal.font.size = None
     rpr = normal.element.get_or_add_rPr()
     rfonts = rpr.find(qn("w:rFonts"))
     if rfonts is None:
@@ -67,9 +69,19 @@ def _style_doc_defaults(doc):
     rfonts.set(qn("w:ascii"), BODY_FONT_EN)
     rfonts.set(qn("w:hAnsi"), BODY_FONT_EN)
 
-    # Headings: black colour, same font family
-    from docx.shared import RGBColor
-    for level, size in (("Heading 1", 18), ("Heading 2", 15), ("Heading 3", 13)):
+    # Tight paragraph spacing: no extra blank lines between paragraphs,
+    # just a small 6pt gap so text still breathes.
+    pf = normal.paragraph_format
+    pf.space_before = Pt(0)
+    pf.space_after = Pt(6)
+    pf.line_spacing = 1.15
+
+    # Headings: black colour, same font family, tight spacing
+    for level, size, space_before in (
+        ("Heading 1", 18, 18),
+        ("Heading 2", 15, 14),
+        ("Heading 3", 13, 10),
+    ):
         try:
             st = doc.styles[level]
         except KeyError:
@@ -77,7 +89,7 @@ def _style_doc_defaults(doc):
         st.font.name = HEADING_FONT_EN
         st.font.size = None
         st.font.bold = True
-        st.font.color.rgb = RGBColor.from_string("000000")  # black
+        st.font.color.rgb = RGBColor.from_string("000000")
         rpr = st.element.get_or_add_rPr()
         rfonts = rpr.find(qn("w:rFonts"))
         if rfonts is None:
@@ -87,6 +99,8 @@ def _style_doc_defaults(doc):
         rfonts.set(qn("w:eastAsia"), HEADING_FONT_CN)
         rfonts.set(qn("w:ascii"), HEADING_FONT_EN)
         rfonts.set(qn("w:hAnsi"), HEADING_FONT_EN)
+        st.paragraph_format.space_before = Pt(space_before)
+        st.paragraph_format.space_after = Pt(6)
 
 
 class DocumentError(RuntimeError):
@@ -152,12 +166,15 @@ def markdown_to_docx(markdown_text: str, docx_path: str) -> str:
         ) from e
 
     doc = docx.Document()
-    _style_doc_defaults(doc)  # fix CJK / heading font + colour
+    _style_doc_defaults(doc)  # fix CJK / heading font + colour + tight spacing
+
+    # No blank paragraphs at all — spacing between paragraphs is handled by
+    # the Normal style's space_after (6pt). Headings have their own
+    # space_before / space_after. This is what eliminates the giant gaps.
     for raw_line in markdown_text.splitlines():
         line = raw_line.rstrip()
         if not line.strip():
-            doc.add_paragraph("")
-            continue
+            continue  # skip blank lines entirely
         _add_markdown_paragraph(doc, line)
 
     os.makedirs(os.path.dirname(docx_path), exist_ok=True)
